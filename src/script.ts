@@ -1,11 +1,104 @@
 import './style.css';
 
-// Initialize canvas and context first
-const canvas = document.getElementById('gameCanvas');
-const ctx = canvas.getContext('2d');
+// Type definitions
+interface Point {
+    x: number;
+    y: number;
+}
 
-// Game state - Fixed: Added all missing properties
-let gameState = {
+interface PathPoint extends Point {
+    pathIndex: number;
+}
+
+interface MapData {
+    name: string;
+    desc: string;
+    difficulty: string;
+    theme: string;
+    paths: Point[][];
+    spawns: PathPoint[];
+}
+
+interface FriendStats {
+    cost: number;
+    damage: number;
+    range: number;
+    fireRate: number;
+    color: string;
+    special: string;
+    strong: string[];
+    weak: string[];
+    upgrades: string[];
+    desc: string;
+    category: string;
+    experienceLevel?: number;
+    maxExperience?: number;
+}
+
+interface EnemyStats {
+    health: number;
+    speed: number;
+    reward: number;
+    socialDamage: number;
+    color: string;
+    name: string;
+    icon: string;
+    desc: string;
+    category: string;
+}
+
+interface WaveConfig {
+    enemies: string[];
+    count: number;
+    name: string;
+    desc: string;
+}
+
+interface UpgradeOption {
+    name: string;
+    cost: number;
+    desc: string;
+    icon: string;
+}
+
+interface GameState {
+    health: number;
+    money: number;
+    wave: number;
+    score: number;
+    selectedFriend: string | null;
+    enemies: Enemy[];
+    friends: Friend[];
+    projectiles: Projectile[];
+    speechBubbles: SpeechBubble[];
+    trains: Train[];
+    waveActive: boolean;
+    enemiesRemaining: number;
+    codingProgress: number;
+    bananas: Banana[];
+    selectedFriendForUpgrade: Friend | null;
+    enemiesSpawned: number;
+    gameOver: boolean;
+    gameStarted: boolean;
+    mapSelected: boolean;
+    currentMap: number | null;
+    totalEnemiesDefeated: number;
+    gameSpeed: number;
+    darioPhotoUsed: boolean;
+    tonyMoveUsed: boolean;
+    trainRampageUsed: boolean;
+    movingTony: Friend | null;
+    unlockedMaps: number[];
+    mouseX?: number;
+    mouseY?: number;
+}
+
+// Initialize canvas and context first
+const canvas = document.getElementById('gameCanvas') as HTMLCanvasElement;
+const ctx = canvas.getContext('2d') as CanvasRenderingContext2D;
+
+// Game state
+let gameState: GameState = {
     health: 20,
     money: 100,
     wave: 1,
@@ -14,8 +107,8 @@ let gameState = {
     enemies: [],
     friends: [],
     projectiles: [],
-    speechBubbles: [], // Fixed: Added missing speechBubbles array
-    trains: [], // New: Track Ruel's train rampages
+    speechBubbles: [],
+    trains: [],
     waveActive: false,
     enemiesRemaining: 0,
     codingProgress: 0,
@@ -23,20 +116,20 @@ let gameState = {
     selectedFriendForUpgrade: null,
     enemiesSpawned: 0,
     gameOver: false,
-    gameStarted: false, // Fixed: Added missing gameStarted flag
-    mapSelected: false, // New: Track if map is selected
-    currentMap: null, // New: Current map index
+    gameStarted: false,
+    mapSelected: false,
+    currentMap: null,
     totalEnemiesDefeated: 0,
-    gameSpeed: 1, // 1 = normal, 2 = fast
-    // New special abilities per wave (reset each wave)
+    gameSpeed: 1,
     darioPhotoUsed: false,
     tonyMoveUsed: false,
-    trainRampageUsed: false, // New: Ruel's train ability
-    movingTony: null // Track which Tony is being moved
+    trainRampageUsed: false,
+    movingTony: null,
+    unlockedMaps: [0]
 };
 
-// Maps - Progressive difficulty with multiple paths
-const maps = [
+// Maps
+const maps: MapData[] = [
     {
         name: "Local Dev Environment",
         desc: "Simple setup - just you and your code",
@@ -214,11 +307,8 @@ const maps = [
     }
 ];
 
-// Current game path (will be set based on selected map)
-let currentGamePath = maps[0].paths[0]; // Default to first map
-
-// Friend types with color coordination - Updated with special abilities
-const friendTypes = {
+// Friend types
+const friendTypes: { [key: string]: FriendStats } = {
     dario: {
         cost: 50, damage: 15, range: 100, fireRate: 1000, color: '#FF9800',
         special: 'family_photo',
@@ -314,7 +404,7 @@ const friendTypes = {
         upgrades: ['study', 'experience', 'wisdom'],
         desc: 'Student who gets stronger over time. Learns from every interaction!',
         category: 'scholar-specialist',
-        experienceLevel: 0, // Special property for scaling
+        experienceLevel: 0,
         maxExperience: 10
     },
     aviva: {
@@ -335,19 +425,14 @@ const friendTypes = {
     }
 };
 
-// Enemy types with color coordination
-const enemyTypes = {
-    // Basic (1 person each) - Light colors
+// Enemy types
+const enemyTypes: { [key: string]: EnemyStats } = {
     neighbor: { health: 30, speed: 1, reward: 10, socialDamage: 1, color: '#FFE082', name: 'Chatty Neighbor', icon: '🏠', desc: 'Wants to talk about the weather and property values.', category: 'gullible' },
     clerk: { health: 25, speed: 1.2, reward: 8, socialDamage: 1, color: '#A5D6A7', name: 'Retail Clerk', icon: '🛍️', desc: 'Did you find everything you need today?', category: 'gullible' },
     uber: { health: 35, speed: 0.8, reward: 12, socialDamage: 1, color: '#90CAF9', name: 'Uber Driver', icon: '🚗', desc: 'Trapped audience who wants to share life philosophy.', category: 'gullible' },
-
-    // Medium (1.5 people each) - Medium colors
     performer: { health: 40, speed: 1.8, reward: 18, socialDamage: 1.5, color: '#CE93D8', name: 'Street Performer', icon: '🎭', desc: 'High energy entertainer demanding audience participation.', category: 'energetic' },
     elderly: { health: 50, speed: 0.6, reward: 22, socialDamage: 1.5, color: '#BCAAA4', name: 'Elderly Storyteller', icon: '👴', desc: 'Has many stories from "back in my day".', category: 'patient' },
     gymguy: { health: 55, speed: 1.4, reward: 20, socialDamage: 1.5, color: '#FFAB91', name: 'Gym Regular', icon: '💪', desc: 'Wants to discuss your workout routine and protein intake.', category: 'energetic' },
-
-    // High (2-3 people each) - Dark colors
     boss: { health: 80, speed: 0.9, reward: 28, socialDamage: 2.5, color: '#F48FB1', name: 'Boss', icon: '💼', desc: 'Needs to circle back and touch base about synergies.', category: 'professional' },
     evangelist: { health: 70, speed: 1.1, reward: 26, socialDamage: 2, color: '#FFF176', name: 'Evangelist', icon: '📖', desc: 'Very persistent about sharing good news.', category: 'persistent' },
     oversharer: { health: 60, speed: 1.2, reward: 22, socialDamage: 2, color: '#FFAB91', name: 'Oversharer', icon: '😭', desc: 'Dumps entire relationship history on strangers.', category: 'emotional' },
@@ -355,8 +440,6 @@ const enemyTypes = {
     bartender: { health: 85, speed: 0.7, reward: 30, socialDamage: 2.5, color: '#E6EE9C', name: 'Bartender', icon: '🍺', desc: 'Professional conversationalist with endless small talk.', category: 'patient' },
     coworker: { health: 65, speed: 1, reward: 25, socialDamage: 2, color: '#B39DDB', name: 'Bad Code Coworker', icon: '💻', desc: 'Submits terrible code and wants you to fix it.', category: 'nerdy' },
     intern: { health: 45, speed: 2, reward: 20, socialDamage: 2, color: '#FFCC80', name: 'Clueless Intern', icon: '🤷', desc: 'Asks endless questions and follows you around.', category: 'nerdy' },
-
-    // Special/Boss enemies - Very dark colors
     elevator: { health: 40, speed: 2.2, reward: 18, socialDamage: 1.5, color: '#D1C4E9', name: 'Elevator Person', icon: '🏢', desc: 'Awkward small talk in confined vertical space.', category: 'fast' },
     uberboss: { health: 200, speed: 0.5, reward: 80, socialDamage: 5, color: '#1565C0', name: 'Uber Driver Boss', icon: '🚙', desc: 'Ultimate captive audience nightmare with strong opinions.', category: 'boss' },
     karen: { health: 250, speed: 0.6, reward: 100, socialDamage: 7, color: '#AD1457', name: 'Karen Manager Meeting', icon: '👩‍💼', desc: 'Meeting that could have been an email but wants face time.', category: 'boss' },
@@ -364,7 +447,7 @@ const enemyTypes = {
 };
 
 // Wave configurations
-const waveConfigs = [
+const waveConfigs: WaveConfig[] = [
     { enemies: ['neighbor', 'clerk'], count: 3, name: 'Monday Morning', desc: 'Just some basic social interactions to start the day.' },
     { enemies: ['neighbor', 'clerk', 'uber'], count: 4, name: 'Grocery Run', desc: 'Running errands exposes you to more people.' },
     { enemies: ['performer', 'elderly'], count: 4, name: 'Park Walk', desc: 'Street performers and chatty elderly folks.' },
@@ -380,7 +463,7 @@ const waveConfigs = [
 ];
 
 // Upgrade definitions
-const upgradeOptions = {
+const upgradeOptions: { [key: string]: UpgradeOption } = {
     damage: { name: 'More Damage', cost: 60, desc: '+50% damage', icon: '💥' },
     rate: { name: 'Faster Fire', cost: 50, desc: '+40% fire rate', icon: '⚡' },
     range: { name: 'Longer Range', cost: 65, desc: '+30% range', icon: '🎯' },
@@ -413,12 +496,17 @@ const upgradeOptions = {
     listening: { name: 'Active Listening', cost: 55, desc: 'Heals nearby friends while grappling', icon: '👂' }
 };
 
-let currentSlotToDelete = null;
-let currentSaveSlot = null;
+let currentSlotToDelete: string | null = null;
+let currentSaveSlot: string | null = null;
 
-// Speech bubble system
 class SpeechBubble {
-    constructor(x, y, message) {
+    x: number;
+    y: number;
+    message: string;
+    life: number;
+    maxLife: number;
+
+    constructor(x: number, y: number, message: string) {
         this.x = x;
         this.y = y;
         this.message = message;
@@ -436,7 +524,6 @@ class SpeechBubble {
         const alpha = Math.min(1, this.life / 60);
         ctx.globalAlpha = alpha;
 
-        // --- Styling ---
         const fontSize = 12;
         ctx.font = `${fontSize}px Courier New`;
         ctx.textBaseline = 'top';
@@ -445,18 +532,16 @@ class SpeechBubble {
         const borderColor = '#00ff41';
         const padding = 8;
         const pointerH = 10;
-        const maxBubbleWidth = 200;   // you can tweak this
+        const maxBubbleWidth = 200;
 
-        // --- Wrap text into lines ---
         const words = this.message.split(' ');
-        const lines = [];
+        const lines: string[] = [];
         let line = '';
 
         for (let word of words) {
             const testLine = line ? (line + ' ' + word) : word;
             const metrics = ctx.measureText(testLine);
             if (metrics.width + padding * 2 > maxBubbleWidth) {
-                // current line is full
                 if (line) lines.push(line);
                 line = word;
             } else {
@@ -465,7 +550,6 @@ class SpeechBubble {
         }
         if (line) lines.push(line);
 
-        // --- Compute bubble size ---
         let bubbleWidth = 0;
         for (let l of lines) {
             const w = ctx.measureText(l).width;
@@ -475,29 +559,23 @@ class SpeechBubble {
         const lineHeight = fontSize * 1.2;
         const bubbleHeight = lines.length * lineHeight + padding * 2;
 
-        // --- Clamp bubble position ---
         const halfW = bubbleWidth / 2;
-        // desired anchor is bottom-center at (this.x, this.y)
         let bx = this.x;
         if (bx - halfW < 0) bx = halfW;
         else if (bx + halfW > canvas.width) bx = canvas.width - halfW;
 
-        // desired top-left y is this.y - pointerH - bubbleHeight
         let by = this.y - pointerH - bubbleHeight;
         if (by < 0) by = 0;
         else if (by + bubbleHeight + pointerH > canvas.height) {
-            // if it would go below viewport, bump it up
             by = canvas.height - bubbleHeight - pointerH;
         }
 
-        // --- Draw bubble rect ---
         ctx.fillStyle = bgColor;
         ctx.strokeStyle = borderColor;
         ctx.lineWidth = 2;
         ctx.fillRect(bx - halfW, by, bubbleWidth, bubbleHeight);
         ctx.strokeRect(bx - halfW, by, bubbleWidth, bubbleHeight);
 
-        // --- Draw pointer ---
         const px = this.x;
         const py = by + bubbleHeight;
         ctx.beginPath();
@@ -508,8 +586,8 @@ class SpeechBubble {
         ctx.fill();
         ctx.stroke();
 
-        // --- Draw text lines ---
         ctx.fillStyle = textColor;
+        ctx.textAlign = 'center';
         for (let i = 0; i < lines.length; i++) {
             const textX = bx;
             const textY = by + padding + i * lineHeight;
@@ -518,32 +596,29 @@ class SpeechBubble {
 
         ctx.globalAlpha = 1;
     }
-
 }
 
-function addSpeechBubble(x, y, message) {
+function addSpeechBubble(x: number, y: number, message: string) {
     gameState.speechBubbles.push(new SpeechBubble(x, y, message));
 }
 
 function familyPhoto() {
-    // Pause all enemies for 3 seconds
     for (let enemy of gameState.enemies) {
         if (enemy.alive && !enemy.converted) {
-            enemy.stun(180); // 3 seconds at 60fps
+            enemy.stun(180);
         }
     }
     addSpeechBubble(400, 200, "Family photo time! Everyone smile! 📷");
     showNotification("Dario's family photo paused all enemies!");
 }
 
-function trainRampage(ruelFriend) {
+function trainRampage(ruelFriend: Friend) {
+    if (gameState.currentMap === null) return;
     const currentMap = maps[gameState.currentMap];
     const spawnYOffsets = [-30, 30];
 
-    // 1. Randomly pick a path instead of always the closest
     const randomPath = currentMap.paths[Math.floor(Math.random() * currentMap.paths.length)];
 
-    // Find closest segment on the selected path
     let best = { dist: Infinity, idx: 0 };
     for (let i = 0; i < randomPath.length - 1; i++) {
         const a = randomPath[i], b = randomPath[i + 1];
@@ -552,12 +627,10 @@ function trainRampage(ruelFriend) {
         if (d < best.dist) best = { dist: d, idx: i };
     }
 
-    // 2. Determine how many trains and their damage
     const isUpgraded = ruelFriend.upgrades.includes('trains');
     const trainCount = isUpgraded ? 2 : 1;
     const trainDamage = isUpgraded ? 120 : 80;
 
-    // 3. Spawn trains on the randomly selected path
     for (let t = 0; t < trainCount; t++) {
         const train = new Train(ruelFriend.x, ruelFriend.y + (spawnYOffsets[t] || 0));
         train.path = randomPath;
@@ -574,56 +647,61 @@ function trainRampage(ruelFriend) {
     showNotification(isUpgraded ? "Double train power!" : "Ruel's train is coming through!");
 }
 
-
-// Train rampage class for Ruel's special ability
 class Train {
+    x: number;
+    y: number;
+    speed: number;
+    damage: number;
+    width: number;
+    height: number;
+    life: number;
+    maxLife: number;
+    hitEnemies: Set<Enemy>;
+    path: Point[] | null;
+    nextWaypoint: number;
+    pathComplete: boolean;
+    goingBackwards: boolean;
 
-    constructor(startX, startY) {  // Remove direction parameter
+    constructor(startX: number, startY: number) {
         this.x = startX;
         this.y = startY;
-        // Remove this.direction
         this.speed = 4;
         this.damage = 80;
-        this.width = 60;  // Make it consistent size
+        this.width = 60;
         this.height = 40;
         this.life = 200;
         this.maxLife = 300;
         this.hitEnemies = new Set();
-
-        // Add path-following properties like enemies have
-        this.path = null;           // Will be set by trainRampage
-        this.nextWaypoint = 0;      // Current target waypoint index
-        this.pathComplete = false;  // Track if train finished the path
-        this.goingBackwards = false;  // New flag for direction
+        this.path = null;
+        this.nextWaypoint = 0;
+        this.pathComplete = false;
+        this.goingBackwards = false;
     }
 
     update() {
         this.life -= gameState.gameSpeed;
 
-        // Path-following movement
         if (this.path && !this.pathComplete) {
             const target = this.path[this.nextWaypoint];
 
             if (target) {
-                // Move towards current target waypoint
                 const dx = target.x - this.x;
                 const dy = target.y - this.y;
                 const distance = Math.sqrt(dx * dx + dy * dy);
 
-                if (distance < 8) {  // Reached current waypoint
+                if (distance < 8) {
                     if (this.goingBackwards) {
-                        this.nextWaypoint--;  // Go to previous waypoint
+                        this.nextWaypoint--;
                         if (this.nextWaypoint < 0) {
-                            this.pathComplete = true;  // Reached start of path
+                            this.pathComplete = true;
                         }
                     } else {
-                        this.nextWaypoint++;  // Go to next waypoint (original behavior)
+                        this.nextWaypoint++;
                         if (this.nextWaypoint >= this.path.length) {
-                            this.pathComplete = true;  // Reached end of path
+                            this.pathComplete = true;
                         }
                     }
                 } else {
-                    // Move towards target
                     const moveSpeed = this.speed * gameState.gameSpeed;
                     this.x += (dx / distance) * moveSpeed;
                     this.y += (dy / distance) * moveSpeed;
@@ -631,18 +709,15 @@ class Train {
             }
         }
 
-        // Rest of collision detection stays the same...
         for (let enemy of gameState.enemies) {
             if (!enemy.alive || enemy.converted || this.hitEnemies.has(enemy)) continue;
 
-            // Simplified collision - just check distance
             const distance = Math.sqrt((enemy.x - this.x) ** 2 + (enemy.y - this.y) ** 2);
-            if (distance < 30) {  // Collision radius
+            if (distance < 30) {
                 this.hitEnemies.add(enemy);
                 enemy.takeDamage(this.damage, 'train');
                 addSpeechBubble(enemy.x, enemy.y - 30, "CHOO CHOO! 🚂");
 
-                // Create explosion effect
                 for (let i = 0; i < 12; i++) {
                     gameState.bananas.push(new Banana(enemy.x, enemy.y));
                 }
@@ -656,23 +731,19 @@ class Train {
         const alpha = Math.min(1, this.life / 60);
         ctx.globalAlpha = alpha;
 
-        // Train body
         ctx.fillStyle = '#4CAF50';
         ctx.fillRect(this.x - this.width / 2, this.y - this.height / 2, this.width, this.height);
 
-        // Train border
         ctx.strokeStyle = '#2E7D32';
         ctx.lineWidth = 3;
         ctx.strokeRect(this.x - this.width / 2, this.y - this.height / 2, this.width, this.height);
 
-        // Train emoji
         ctx.fillStyle = 'white';
         ctx.font = 'bold 20px Arial';
         ctx.textAlign = 'center';
         ctx.fillText('🚂', this.x, this.y + 7);
 
-        // Steam trail - calculate direction based on next waypoint
-        let trailDx = 15, trailDy = 0;  // Default trail direction
+        let trailDx = 15, trailDy = 0;
 
         if (this.path && this.nextWaypoint >= 0 && this.nextWaypoint < this.path.length) {
             const target = this.path[this.nextWaypoint];
@@ -681,7 +752,6 @@ class Train {
             const distance = Math.sqrt(dx * dx + dy * dy);
 
             if (distance > 0) {
-                // Trail goes opposite to movement direction
                 trailDx = -(dx / distance) * 20;
                 trailDy = -(dy / distance) * 20;
             }
@@ -699,13 +769,20 @@ class Train {
     }
 
     isAlive() {
-        // return this.life > 0 && (this.x < canvas.width + 100) && (this.y < canvas.height + 100);
         return this.life > 0 && !this.pathComplete;
     }
 }
 
 class Banana {
-    constructor(x, y) {
+    x: number;
+    y: number;
+    vx: number;
+    vy: number;
+    gravity: number;
+    life: number;
+    maxLife: number;
+
+    constructor(x: number, y: number) {
         this.x = x;
         this.y = y;
         this.vx = (Math.random() - 0.5) * 8;
@@ -732,16 +809,37 @@ class Banana {
 }
 
 class Enemy {
-    constructor(type) {
+    type: string;
+    maxHealth: number;
+    health: number;
+    baseSpeed: number;
+    speed: number;
+    reward: number;
+    socialDamage: number;
+    color: string;
+    name: string;
+    icon: string;
+    currentPath: Point[];
+    x: number;
+    y: number;
+    pathIndex: number;
+    alive: boolean;
+    slowEffect: number;
+    stunned: number;
+    converted: boolean;
+    reachedEnd: boolean;
+    grappled: boolean;
+    grappleStun: number;
+    justDied: boolean = false;
+
+    constructor(type: string) {
         const enemyType = enemyTypes[type];
         this.type = type;
 
-        // Health scaling
         const healthScale = Math.pow(1.15, gameState.wave - 1);
         this.maxHealth = Math.floor(enemyType.health * healthScale);
         this.health = this.maxHealth;
 
-        // Speed scaling
         this.baseSpeed = enemyType.speed * (1 + (gameState.wave - 1) * 0.03);
         this.speed = this.baseSpeed;
         this.reward = Math.floor(enemyType.reward * (1 + (gameState.wave - 1) * 0.05));
@@ -750,12 +848,12 @@ class Enemy {
         this.name = enemyType.name;
         this.icon = enemyType.icon;
 
-        // NEW: Handle multiple spawn points and paths
+        if (gameState.currentMap === null) throw new Error("Current map is not set");
         const currentMap = maps[gameState.currentMap];
         const spawnPoint = currentMap.spawns[Math.floor(Math.random() * currentMap.spawns.length)];
         this.currentPath = currentMap.paths[spawnPoint.pathIndex];
 
-        this.x = spawnPoint.x - 30; // Start before spawn point
+        this.x = spawnPoint.x - 30;
         this.y = spawnPoint.y;
         this.pathIndex = 0;
         this.alive = true;
@@ -763,62 +861,50 @@ class Enemy {
         this.stunned = 0;
         this.converted = false;
         this.reachedEnd = false;
-        this.grappled = false; // New: For Oise's grappling ability
-        this.grappleStun = 0; // New: Duration of grapple stun
+        this.grappled = false;
+        this.grappleStun = 0;
     }
 
     update() {
         if (!this.alive || gameState.gameOver) return;
 
-        // Handle stun
         if (this.stunned > 0) {
             this.stunned -= gameState.gameSpeed;
             return;
         }
 
-        // Handle grappling (Oise's special ability)
         if (this.grappled && this.grappleStun > 0) {
             this.grappleStun -= gameState.gameSpeed;
             if (this.grappleStun <= 0) {
                 this.grappled = false;
             }
-            return; // Can't move while grappled
+            return;
         }
 
-        // Apply slow effect
         this.speed = this.baseSpeed;
         if (this.slowEffect > 0) {
-            this.speed *= 0.3; // 70% speed reduction when slowed
+            this.speed *= 0.3;
             this.slowEffect -= gameState.gameSpeed;
         }
 
-        // Apply game speed
         const currentSpeed = this.speed * gameState.gameSpeed;
 
-        // Move towards next path point
         let targetIndex = this.converted ? Math.max(0, this.pathIndex - 1) : this.pathIndex + 1;
         const target = this.currentPath[targetIndex];
 
         if (!target) {
             if (this.converted) {
-                // Converted enemy reached start, remove safely
                 this.alive = false;
                 return;
             } else {
-                // Enemy reached Ben's tower - DEAL SOCIAL DAMAGE!
                 if (!this.reachedEnd) {
                     this.reachedEnd = true;
                     addSpeechBubble(this.x, this.y - 30, `${this.name} drained ${this.socialDamage} social energy!`);
-
-                    // CRITICAL: Actually reduce health!
                     gameState.health = Math.max(0, gameState.health - this.socialDamage);
-
-                    // Check for game over
                     if (gameState.health <= 0) {
                         gameState.gameOver = true;
                         showGameOver();
                     }
-
                     updateUI();
                 }
                 this.alive = false;
@@ -845,29 +931,24 @@ class Enemy {
     draw() {
         if (!this.alive) return;
 
-        // Enemy body with color coordination
         ctx.fillStyle = this.converted ? '#00ff41' : this.color;
         if (this.type === 'karen' || this.type === 'uberboss' || this.type === 'uncle') {
-            // Boss enemies are bigger
             ctx.fillRect(this.x - 12, this.y - 12, 24, 24);
         } else {
             ctx.fillRect(this.x - 8, this.y - 8, 16, 16);
         }
 
-        // Add visual indicators
         ctx.fillStyle = 'white';
         ctx.font = '12px Arial';
         ctx.textAlign = 'center';
         ctx.fillText(this.icon, this.x, this.y + 4);
 
-        // Health bar
         const healthPercent = this.health / this.maxHealth;
         ctx.fillStyle = 'red';
         ctx.fillRect(this.x - 12, this.y - 18, 24, 4);
         ctx.fillStyle = 'green';
         ctx.fillRect(this.x - 12, this.y - 18, 24 * healthPercent, 4);
 
-        // Effect indicators
         if (this.slowEffect > 0) {
             ctx.strokeStyle = 'blue';
             ctx.lineWidth = 2;
@@ -890,29 +971,28 @@ class Enemy {
         }
     }
 
-    takeDamage(damage, attackerType) {
+    takeDamage(damage: number, attackerType: string) {
         if (!this.alive || this.converted) return;
 
         let finalDamage = damage;
 
-        // Calculate effectiveness multipliers
         const friendData = friendTypes[attackerType];
         if (friendData) {
             if (friendData.strong.includes(this.type)) {
-                finalDamage *= 2; // 2x damage vs strong matchups
+                finalDamage *= 2;
             } else if (friendData.weak.includes(this.type)) {
-                finalDamage *= 0.5; // 0.5x damage vs weak matchups
+                finalDamage *= 0.5;
             }
         }
 
         this.health -= finalDamage;
         if (this.health <= 0) {
             this.alive = false;
+            this.justDied = true;
             gameState.money += this.reward;
             gameState.score += this.reward;
             gameState.totalEnemiesDefeated++;
 
-            // Create banana explosion
             for (let i = 0; i < 8; i++) {
                 gameState.bananas.push(new Banana(this.x, this.y));
             }
@@ -921,11 +1001,11 @@ class Enemy {
         }
     }
 
-    applySlow(duration) {
+    applySlow(duration: number) {
         this.slowEffect = Math.max(this.slowEffect, duration);
     }
 
-    stun(duration) {
+    stun(duration: number) {
         this.stunned = Math.max(this.stunned, duration);
     }
 
@@ -936,41 +1016,50 @@ class Enemy {
 }
 
 class Friend {
-    constructor(x, y, type) {
+    x: number;
+    y: number;
+    type: string;
+    stats: FriendStats;
+    lastShot: number;
+    target: Enemy | null;
+    specialCooldown: number;
+    upgrades: string[];
+    experienceLevel?: number;
+    maxExperience?: number;
+    experienceGainRate?: number;
+    grappledEnemies?: { enemy: Enemy, duration: number }[];
+
+    constructor(x: number, y: number, type: string) {
         this.x = x;
         this.y = y;
         this.type = type;
-        this.stats = JSON.parse(JSON.stringify(friendTypes[type])); // Deep copy
+        this.stats = JSON.parse(JSON.stringify(friendTypes[type]));
         this.lastShot = 0;
         this.target = null;
         this.specialCooldown = 0;
         this.upgrades = [];
 
-        // Special properties for new friends
         if (type === 'maddie') {
             this.experienceLevel = 0;
             this.maxExperience = 10;
-            this.experienceGain = 0; // Track experience from nearby kills
+            this.experienceGainRate = 1;
         }
         if (type === 'oise') {
-            this.grappledEnemies = []; // Track grappled enemies
+            this.grappledEnemies = [];
         }
     }
 
     update() {
         if (gameState.gameOver) return;
 
-        // Special update for Maddie's experience system
         if (this.type === 'maddie') {
             this.updateMaddieExperience();
         }
 
-        // Special update for Oise's grappling
         if (this.type === 'oise') {
             this.updateOiseGrappling();
         }
 
-        // Find closest enemy in range
         this.target = null;
         let closestDistance = this.stats.range;
 
@@ -987,28 +1076,27 @@ class Friend {
             }
         }
 
-        // Attack target (adjust fire rate for game speed)
         const adjustedFireRate = this.stats.fireRate / gameState.gameSpeed;
         if (this.target && Date.now() - this.lastShot > adjustedFireRate) {
             this.attack();
             this.lastShot = Date.now();
         }
 
-        // Special abilities
         if (this.specialCooldown > 0) this.specialCooldown -= gameState.gameSpeed;
         this.useSpecialAbility();
     }
 
     updateMaddieExperience() {
-        // Maddie gains experience from nearby enemy defeats
+        if (this.type !== 'maddie' || this.experienceLevel === undefined || this.maxExperience === undefined) return;
+
         const experienceRadius = 150;
         let newExperience = 0;
 
         for (let enemy of gameState.enemies) {
-            if (!enemy.alive && enemy.justDied) {
+            if (enemy.justDied) {
                 const distance = Math.sqrt((enemy.x - this.x) ** 2 + (enemy.y - this.y) ** 2);
                 if (distance < experienceRadius) {
-                    newExperience += 1;
+                    newExperience += (this.experienceGainRate || 1);
                 }
             }
         }
@@ -1016,9 +1104,8 @@ class Friend {
         if (newExperience > 0 && this.experienceLevel < this.maxExperience) {
             this.experienceLevel = Math.min(this.maxExperience, this.experienceLevel + newExperience);
 
-            // Scale damage based on experience
             const baseDamage = friendTypes.maddie.damage;
-            const experienceMultiplier = 1 + (this.experienceLevel * 0.15); // 15% per level
+            const experienceMultiplier = 1 + (this.experienceLevel * 0.15);
             this.stats.damage = Math.floor(baseDamage * experienceMultiplier);
 
             if (this.experienceLevel === this.maxExperience) {
@@ -1028,7 +1115,8 @@ class Friend {
     }
 
     updateOiseGrappling() {
-        // Update grappled enemies - remove dead ones, tick down timers
+        if (this.type !== 'oise' || !this.grappledEnemies) return;
+
         this.grappledEnemies = this.grappledEnemies.filter(grapple => {
             if (!grapple.enemy.alive) return false;
 
@@ -1044,18 +1132,14 @@ class Friend {
     attack() {
         if (!this.target) return;
 
-        // Special case: Sao and Pō only slow unless they have damage upgrade
         if ((this.stats.special === 'slow_only' || this.stats.special === 'conspiracy_only') &&
             !this.upgrades.includes('damage')) {
-            // They just slow, no projectile
             return;
         }
 
         if (this.stats.special.includes('wide') && this.upgrades.includes('wide')) {
-            // Wideshot attack (only if upgraded for AOE)
             this.wideshotAttack();
         } else {
-            // Normal projectile
             gameState.projectiles.push(new Projectile(
                 this.x, this.y, this.target, this.stats.damage, this.type
             ));
@@ -1063,7 +1147,6 @@ class Friend {
     }
 
     wideshotAttack() {
-        // Hit all enemies in range
         const effectiveRange = this.stats.range + (this.upgrades.includes('wide') ? 50 : 0);
         for (let enemy of gameState.enemies) {
             if (!enemy.alive || enemy.converted) continue;
@@ -1085,7 +1168,6 @@ class Friend {
 
         switch (this.stats.special) {
             case 'listener':
-                // Sophia heals nearby friends
                 const healAmount = this.upgrades.includes('heal') ? 400 : 200;
                 for (let friend of gameState.friends) {
                     const distance = Math.sqrt((friend.x - this.x) ** 2 + (friend.y - this.y) ** 2);
@@ -1097,7 +1179,6 @@ class Friend {
                 break;
 
             case 'slow_only':
-                // Sao's pure slowdown
                 const saoSlowDuration = this.upgrades.includes('slow') ? 150 : 90;
                 for (let enemy of gameState.enemies) {
                     if (!enemy.alive || enemy.converted) continue;
@@ -1110,7 +1191,6 @@ class Friend {
                 break;
 
             case 'conspiracy_only':
-                // Pō's conspiracy theories
                 if (this.upgrades.includes('convert')) {
                     for (let enemy of gameState.enemies) {
                         if (!enemy.alive || enemy.converted) continue;
@@ -1122,7 +1202,6 @@ class Friend {
                     }
                     this.specialCooldown = 600;
                 } else {
-                    // Regular conspiracy slow
                     const slowDuration = this.upgrades.includes('conspiracy') ? 120 : 80;
                     for (let enemy of gameState.enemies) {
                         if (!enemy.alive || enemy.converted) continue;
@@ -1136,7 +1215,6 @@ class Friend {
                 break;
 
             case 'cuteness_wide':
-                // Wrenly stuns if upgraded
                 if (this.upgrades.includes('cute')) {
                     for (let enemy of gameState.enemies) {
                         if (!enemy.alive || enemy.converted) continue;
@@ -1150,7 +1228,6 @@ class Friend {
                 break;
 
             case 'singing_stun':
-                // Aviva's singing stuns enemies
                 const singRange = this.upgrades.includes('harmony') ? this.stats.range + 50 : this.stats.range;
                 const stunDuration = this.upgrades.includes('harmony') ? 120 : 80;
                 let stunCount = 0;
@@ -1173,8 +1250,8 @@ class Friend {
                 break;
 
             case 'grapple_close':
-                // Oise's grappling ability
-                const grappleRange = 60; // Very short range
+                if (!this.grappledEnemies) return;
+                const grappleRange = 60;
                 const maxGrapples = this.upgrades.includes('strength') ? 3 : 1;
                 const grappleDuration = this.upgrades.includes('grapple') ? 300 : 180;
 
@@ -1196,7 +1273,6 @@ class Friend {
                     }
                 }
 
-                // Active listening healing while grappling
                 if (this.upgrades.includes('listening') && this.grappledEnemies.length > 0) {
                     for (let friend of gameState.friends) {
                         const distance = Math.sqrt((friend.x - this.x) ** 2 + (friend.y - this.y) ** 2);
@@ -1212,15 +1288,14 @@ class Friend {
     }
 
     canUpgrade() {
-        return this.upgrades.length < 2; // Max 2 upgrades per friend
+        return this.upgrades.length < 2;
     }
 
-    upgrade(upgradeType) {
+    upgrade(upgradeType: string) {
         if (!this.canUpgrade() || this.upgrades.includes(upgradeType)) return false;
 
         this.upgrades.push(upgradeType);
 
-        // Apply upgrade effects
         switch (upgradeType) {
             case 'damage':
                 this.stats.damage = Math.floor(this.stats.damage * 1.5);
@@ -1234,24 +1309,20 @@ class Friend {
             case 'speed':
                 this.stats.fireRate = Math.floor(this.stats.fireRate * 0.33);
                 break;
-            // New upgrade effects for new friends
             case 'study':
                 if (this.type === 'maddie') {
-                    this.experienceGainRate = 2; // Double experience gain
+                    this.experienceGainRate = 2;
                 }
                 break;
             case 'experience':
-                if (this.type === 'maddie') {
+                if (this.type === 'maddie' && this.experienceLevel !== undefined && this.maxExperience !== undefined) {
                     this.experienceLevel = Math.min(this.maxExperience, this.experienceLevel + 5);
                 }
                 break;
             case 'wisdom':
-                if (this.type === 'maddie') {
-                    this.maxExperience = 15; // Can go beyond normal max
+                if (this.type === 'maddie' && this.maxExperience !== undefined) {
+                    this.maxExperience = 15;
                 }
-                break;
-            case 'harmony':
-                // Handled in useSpecialAbility for Aviva
                 break;
             case 'volume':
                 if (this.type === 'aviva') {
@@ -1259,36 +1330,20 @@ class Friend {
                     this.stats.damage = Math.floor(this.stats.damage * 1.3);
                 }
                 break;
-            case 'repertoire':
-                // Handled in useSpecialAbility for Aviva
-                break;
-            case 'strength':
-                // Handled in useSpecialAbility for Oise
-                break;
-            case 'grapple':
-                // Handled in useSpecialAbility for Oise
-                break;
-            case 'listening':
-                // Handled in useSpecialAbility for Oise
-                break;
         }
 
         return true;
     }
 
     draw() {
-        // Friend body with color coordination
         ctx.fillStyle = this.stats.color;
         ctx.fillRect(this.x - 15, this.y - 15, 30, 30);
 
-        // Add a border to make it more visible
         ctx.strokeStyle = '#00ff41';
         ctx.lineWidth = 2;
         ctx.strokeRect(this.x - 15, this.y - 15, 30, 30);
 
-        // Special ability indicators
         if (this.type === 'dario' && !gameState.darioPhotoUsed) {
-            // Photo button indicator
             ctx.fillStyle = 'yellow';
             ctx.fillRect(this.x - 20, this.y - 20, 10, 10);
             ctx.fillStyle = 'black';
@@ -1298,7 +1353,6 @@ class Friend {
         }
 
         if (this.type === 'tony' && !gameState.tonyMoveUsed) {
-            // Move indicator
             ctx.fillStyle = 'cyan';
             ctx.fillRect(this.x + 10, this.y - 20, 10, 10);
             ctx.fillStyle = 'black';
@@ -1308,7 +1362,6 @@ class Friend {
         }
 
         if (this.type === 'ruel' && !gameState.trainRampageUsed) {
-            // Train rampage indicator
             ctx.fillStyle = '#4CAF50';
             ctx.fillRect(this.x - 20, this.y + 10, 10, 10);
             ctx.fillStyle = 'white';
@@ -1317,8 +1370,7 @@ class Friend {
             ctx.fillText('🚂', this.x - 15, this.y + 17);
         }
 
-        // Maddie's experience level indicator
-        if (this.type === 'maddie') {
+        if (this.type === 'maddie' && this.experienceLevel !== undefined && this.maxExperience !== undefined) {
             ctx.fillStyle = '#3F51B5';
             ctx.fillRect(this.x - 20, this.y + 15, 40, 6);
             ctx.fillStyle = '#00ff41';
@@ -1331,19 +1383,16 @@ class Friend {
             ctx.fillText(`LV${this.experienceLevel}`, this.x, this.y + 26);
         }
 
-        // Aviva's singing indicator (when on cooldown)
         if (this.type === 'aviva' && this.specialCooldown > 0) {
             ctx.fillStyle = '#FF6B9D';
             ctx.fillText('♪', this.x - 20, this.y - 20);
         }
 
-        // Oise's grapple count indicator
         if (this.type === 'oise' && this.grappledEnemies && this.grappledEnemies.length > 0) {
             ctx.fillStyle = '#795548';
             ctx.fillText(`🤼${this.grappledEnemies.length}`, this.x + 15, this.y - 20);
         }
 
-        // Upgrade indicators
         if (this.upgrades.length > 0) {
             ctx.fillStyle = 'gold';
             for (let i = 0; i < this.upgrades.length; i++) {
@@ -1351,13 +1400,11 @@ class Friend {
             }
         }
 
-        // Friend identifier
         ctx.fillStyle = 'white';
         ctx.font = 'bold 8px Arial';
         ctx.textAlign = 'center';
         ctx.fillText(this.type.toUpperCase(), this.x, this.y + 2);
 
-        // Range indicator when placing
         if (gameState.selectedFriend === this.type) {
             ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
             ctx.beginPath();
@@ -1368,7 +1415,15 @@ class Friend {
 }
 
 class Projectile {
-    constructor(x, y, target, damage, attackerType) {
+    x: number;
+    y: number;
+    target: Enemy;
+    damage: number;
+    attackerType: string;
+    speed: number;
+    alive: boolean;
+
+    constructor(x: number, y: number, target: Enemy, damage: number, attackerType: string) {
         this.x = x;
         this.y = y;
         this.target = target;
@@ -1389,7 +1444,6 @@ class Projectile {
         const distance = Math.sqrt(dx * dx + dy * dy);
 
         if (distance < 10) {
-            // Hit target
             this.target.takeDamage(this.damage, this.attackerType);
             this.alive = false;
         } else {
@@ -1409,15 +1463,13 @@ class Projectile {
 }
 
 function drawPath() {
-    if (!gameState.mapSelected) return;
+    if (!gameState.mapSelected || gameState.currentMap === null) return;
 
     const currentMap = maps[gameState.currentMap];
 
-    // Draw all paths for current map
     for (let pathIndex = 0; pathIndex < currentMap.paths.length; pathIndex++) {
         const path = currentMap.paths[pathIndex];
 
-        // Draw path background
         ctx.strokeStyle = '#333';
         ctx.lineWidth = 30;
         ctx.beginPath();
@@ -1427,13 +1479,11 @@ function drawPath() {
         }
         ctx.stroke();
 
-        // Path borders
         ctx.strokeStyle = '#555';
         ctx.lineWidth = 2;
         ctx.stroke();
     }
 
-    // Draw spawn points
     for (let spawn of currentMap.spawns) {
         ctx.fillStyle = '#FF4500';
         ctx.font = 'bold 12px Arial';
@@ -1441,7 +1491,6 @@ function drawPath() {
         ctx.fillText('SPAWN', spawn.x + 60, spawn.y + 5);
     }
 
-    // Ben's tower at the end (same for all maps)
     const benPosition = { x: 750, y: 250 };
     ctx.fillStyle = gameState.health <= 5 ? '#ff4757' : '#00ff41';
     ctx.fillRect(benPosition.x - 25, benPosition.y - 25, 50, 50);
@@ -1452,20 +1501,16 @@ function drawPath() {
     ctx.fillText('🧑‍💻', benPosition.x, benPosition.y + 15);
 }
 
-// FIXED: Make sure startGame is properly defined and accessible
 function startGame() {
-    // Close storyline modal
     const storylineModal = document.getElementById('storylineModal');
     if (storylineModal) storylineModal.style.display = 'none';
 
-    // Restore game UI
-    const gameContainer = document.querySelector('.game-container');
+    const gameContainer = document.querySelector('.game-container') as HTMLElement;
     if (gameContainer) {
         gameContainer.style.opacity = '1';
         gameContainer.style.pointerEvents = 'auto';
     }
 
-    // Show start game options (New Game vs Load Game)
     showStartGameOptions();
 }
 
@@ -1535,18 +1580,17 @@ function showMapSelection() {
         });
     }
 
-    if (mapModal) mapModal.style.display = 'flex';
+    if (mapModal) (mapModal as HTMLElement).style.display = 'flex';
 }
 
-function selectMap(mapIndex) {
+function selectMap(mapIndex: number) {
     gameState.currentMap = mapIndex;
     gameState.mapSelected = true;
     gameState.gameStarted = true;
 
     const mapModal = document.getElementById('mapSelectionModal');
-    if (mapModal) mapModal.style.display = 'none';
+    if (mapModal) (mapModal as HTMLElement).style.display = 'none';
 
-    // Update progress text based on selected map
     const progressText = document.getElementById('progressText');
     if (progressText) progressText.textContent = maps[mapIndex].theme;
 
@@ -1554,9 +1598,8 @@ function selectMap(mapIndex) {
     console.log(`Selected map: ${maps[mapIndex].name}`);
 }
 
-function selectFriend(type) {
+function selectFriend(type: string) {
     if (gameState.money >= friendTypes[type].cost && !gameState.gameOver && gameState.gameStarted) {
-        // Clear previous selection
         document.querySelectorAll('.friend-btn').forEach(btn => btn.classList.remove('selected'));
 
         gameState.selectedFriend = type;
@@ -1565,7 +1608,7 @@ function selectFriend(type) {
         if (btn) btn.classList.add('selected');
 
         const cancelText = document.getElementById('cancelText');
-        if (cancelText) cancelText.style.display = 'block';
+        if (cancelText) (cancelText as HTMLElement).style.display = 'block';
 
         console.log(`Selected friend: ${type}`);
     }
@@ -1577,16 +1620,15 @@ function cancelSelection() {
     document.querySelectorAll('.friend-btn').forEach(btn => btn.classList.remove('selected'));
 
     const cancelText = document.getElementById('cancelText');
-    if (cancelText) cancelText.style.display = 'none';
+    if (cancelText) (cancelText as HTMLElement).style.display = 'none';
 }
 
-function placeFriend(x, y) {
+function placeFriend(x: number, y: number) {
     if (!gameState.selectedFriend || gameState.gameOver) return;
 
     const friendType = friendTypes[gameState.selectedFriend];
     if (gameState.money < friendType.cost) return;
 
-    // Check if position is valid
     if (isOnPath(x, y) || isOnFriend(x, y)) {
         showNotification('Cannot place here!');
         return;
@@ -1600,8 +1642,8 @@ function placeFriend(x, y) {
     console.log(`Total friends: ${gameState.friends.length}`);
 }
 
-function isOnPath(x, y) {
-    if (!gameState.mapSelected) return false;
+function isOnPath(x: number, y: number) {
+    if (!gameState.mapSelected || gameState.currentMap === null) return false;
 
     const currentMap = maps[gameState.currentMap];
     for (let path of currentMap.paths) {
@@ -1615,13 +1657,13 @@ function isOnPath(x, y) {
     return false;
 }
 
-function isOnFriend(x, y) {
+function isOnFriend(x: number, y: number) {
     return gameState.friends.some(friend =>
         Math.sqrt((friend.x - x) ** 2 + (friend.y - y) ** 2) < 35
     );
 }
 
-function distanceToLineSegment(px, py, x1, y1, x2, y2) {
+function distanceToLineSegment(px: number, py: number, x1: number, y1: number, x2: number, y2: number) {
     const dx = x2 - x1;
     const dy = y2 - y1;
     const length = Math.sqrt(dx * dx + dy * dy);
@@ -1661,8 +1703,7 @@ function showWavePreview() {
     if (enemyPreview) {
         enemyPreview.innerHTML = '';
 
-        // Show enemy types
-        const enemyCounts = {};
+        const enemyCounts: { [key: string]: number } = {};
         for (let enemyType of waveConfig.enemies) {
             enemyCounts[enemyType] = (enemyCounts[enemyType] || 0) + 1;
         }
@@ -1679,7 +1720,7 @@ function showWavePreview() {
     }
 
     const waveModal = document.getElementById('waveModal');
-    if (waveModal) waveModal.style.display = 'flex';
+    if (waveModal) (waveModal as HTMLElement).style.display = 'flex';
 }
 
 function startNextWave() {
@@ -1689,7 +1730,7 @@ function startNextWave() {
 
 function startWaveFromModal() {
     const waveModal = document.getElementById('waveModal');
-    if (waveModal) waveModal.style.display = 'none';
+    if (waveModal) (waveModal as HTMLElement).style.display = 'none';
 
     gameState.waveActive = true;
     gameState.enemiesSpawned = 0;
@@ -1697,7 +1738,6 @@ function startWaveFromModal() {
     const waveIndex = Math.min(gameState.wave - 1, waveConfigs.length - 1);
     const waveConfig = waveConfigs[waveIndex];
 
-    // Scale enemy count
     const baseCount = waveConfig.count;
     const scaledCount = Math.floor(baseCount * Math.pow(1.1, gameState.wave - 1));
     gameState.enemiesRemaining = scaledCount;
@@ -1724,16 +1764,16 @@ function showGameOver() {
     console.log('Game Over triggered');
 
     const finalWave = document.getElementById('finalWave');
-    if (finalWave) finalWave.textContent = gameState.wave;
+    if (finalWave) finalWave.textContent = String(gameState.wave);
 
     const finalScore = document.getElementById('finalScore');
-    if (finalScore) finalScore.textContent = gameState.score;
+    if (finalScore) finalScore.textContent = String(gameState.score);
 
     const totalEnemies = document.getElementById('totalEnemies');
-    if (totalEnemies) totalEnemies.textContent = gameState.totalEnemiesDefeated;
+    if (totalEnemies) totalEnemies.textContent = String(gameState.totalEnemiesDefeated);
 
     const gameOverModal = document.getElementById('gameOverModal');
-    if (gameOverModal) gameOverModal.style.display = 'flex';
+    if (gameOverModal) (gameOverModal as HTMLElement).style.display = 'flex';
 }
 
 function updateCodingProgress() {
@@ -1752,27 +1792,26 @@ function updateCodingProgress() {
     }
 
     const progressFill = document.getElementById('progressFill');
-    if (progressFill) progressFill.style.width = gameState.codingProgress + '%';
+    if (progressFill) (progressFill as HTMLElement).style.width = gameState.codingProgress + '%';
 }
 
-function showNotification(message) {
+function showNotification(message: string) {
     const notification = document.getElementById('notification');
     if (notification) {
         notification.textContent = message;
-        notification.style.display = 'block';
+        (notification as HTMLElement).style.display = 'block';
         setTimeout(() => {
-            notification.style.display = 'none';
+            (notification as HTMLElement).style.display = 'none';
         }, 3000);
     }
 }
 
-function showUpgradeModal(friend) {
+function showUpgradeModal(friend: Friend) {
     gameState.selectedFriendForUpgrade = friend;
 
     const upgradeTitle = document.getElementById('upgradeTitle');
     if (upgradeTitle) upgradeTitle.textContent = `Upgrade ${friend.type.toUpperCase()}`;
 
-    // Show current upgrades
     let upgradeStatus = `Current upgrades (${friend.upgrades.length}/2 used): `;
     if (friend.upgrades.length === 0) {
         upgradeStatus += 'None';
@@ -1816,11 +1855,12 @@ function showUpgradeModal(friend) {
     }
 
     const upgradeModal = document.getElementById('upgradeModal');
-    if (upgradeModal) upgradeModal.style.display = 'flex';
+    if (upgradeModal) (upgradeModal as HTMLElement).style.display = 'flex';
 }
 
-function applyUpgrade(upgradeType) {
+function applyUpgrade(upgradeType: string) {
     const friend = gameState.selectedFriendForUpgrade;
+    if (!friend) return;
     const upgrade = upgradeOptions[upgradeType];
 
     if (gameState.money >= upgrade.cost && friend.upgrade(upgradeType)) {
@@ -1834,12 +1874,11 @@ function applyUpgrade(upgradeType) {
 
 function closeUpgradeModal() {
     const upgradeModal = document.getElementById('upgradeModal');
-    if (upgradeModal) upgradeModal.style.display = 'none';
+    if (upgradeModal) (upgradeModal as HTMLElement).style.display = 'none';
     gameState.selectedFriendForUpgrade = null;
 }
 
 function showCodex() {
-    // Populate friends codex
     const friendsCodex = document.getElementById('friendsCodex');
     if (friendsCodex) {
         friendsCodex.innerHTML = '';
@@ -1848,7 +1887,6 @@ function showCodex() {
             const div = document.createElement('div');
             div.className = 'codex-item';
 
-            // Add effectiveness indicators
             let strongIndicators = '';
             let weakIndicators = '';
 
@@ -1872,7 +1910,6 @@ function showCodex() {
         }
     }
 
-    // Populate enemies codex
     const enemiesCodex = document.getElementById('enemiesCodex');
     if (enemiesCodex) {
         enemiesCodex.innerHTML = '';
@@ -1881,9 +1918,8 @@ function showCodex() {
             const div = document.createElement('div');
             div.className = 'codex-item';
 
-            // Find which friends are strong/weak against this enemy
-            let counters = [];
-            let struggles = [];
+            let counters: string[] = [];
+            let struggles: string[] = [];
 
             for (let [friendType, friendData] of Object.entries(friendTypes)) {
                 if (friendData.strong.includes(type)) {
@@ -1909,19 +1945,19 @@ function showCodex() {
     }
 
     const codexModal = document.getElementById('codexModal');
-    if (codexModal) codexModal.style.display = 'flex';
+    if (codexModal) (codexModal as HTMLElement).style.display = 'flex';
 }
 
 function closeCodex() {
     const codexModal = document.getElementById('codexModal');
-    if (codexModal) codexModal.style.display = 'none';
+    if (codexModal) (codexModal as HTMLElement).style.display = 'none';
 }
 
 function updateUpgradeIndicators() {
     for (let friend of gameState.friends) {
         const btn = document.getElementById(friend.type + 'Btn');
         if (btn) {
-            const indicator = btn.querySelector('.upgrade-indicator');
+            const indicator = btn.querySelector('.upgrade-indicator') as HTMLElement;
             if (indicator) {
                 if (friend.canUpgrade()) {
                     indicator.style.display = 'flex';
@@ -1934,12 +1970,9 @@ function updateUpgradeIndicators() {
 }
 
 function updateUI() {
-    // Fixed: Added null checks for all DOM elements
     const healthEl = document.getElementById('health');
     if (healthEl) {
-        healthEl.textContent = Math.max(0, gameState.health);
-
-        // Make health flash red when low
+        healthEl.textContent = String(Math.max(0, gameState.health));
         if (gameState.health <= 5) {
             healthEl.classList.add('critical');
         } else {
@@ -1948,31 +1981,28 @@ function updateUI() {
     }
 
     const moneyEl = document.getElementById('money');
-    if (moneyEl) moneyEl.textContent = gameState.money;
+    if (moneyEl) moneyEl.textContent = String(gameState.money);
 
     const waveEl = document.getElementById('wave');
-    if (waveEl) waveEl.textContent = gameState.wave;
+    if (waveEl) waveEl.textContent = String(gameState.wave);
 
     const scoreEl = document.getElementById('score');
-    if (scoreEl) scoreEl.textContent = gameState.score;
+    if (scoreEl) scoreEl.textContent = String(gameState.score);
 
-    // Update button states - disable if no money, game over, game not started, or no map selected
     Object.keys(friendTypes).forEach(type => {
-        const btn = document.getElementById(type + 'Btn');
+        const btn = document.getElementById(type + 'Btn') as HTMLButtonElement;
         if (btn) {
             btn.disabled = gameState.money < friendTypes[type].cost || gameState.gameOver || !gameState.gameStarted || !gameState.mapSelected;
         }
     });
 
-    // Disable wave button if game over, not started, or no map selected
-    const nextWaveBtn = document.getElementById('nextWaveBtn');
+    const nextWaveBtn = document.getElementById('nextWaveBtn') as HTMLButtonElement;
     if (nextWaveBtn) {
         nextWaveBtn.disabled = gameState.gameOver || !gameState.gameStarted || !gameState.mapSelected;
     }
 
     updateUpgradeIndicators();
 
-    // Update wave status
     const statusEl = document.getElementById('waveStatus');
     if (statusEl) {
         if (!gameState.mapSelected) {
@@ -1989,12 +2019,10 @@ function updateUI() {
 
             if (remaining === 0 && gameState.enemiesSpawned >= gameState.enemiesRemaining && !gameState.gameOver) {
                 setTimeout(() => {
-
                     gameState.wave++;
                     autoSave();
 
-                    if (gameState.wave > 12) { // Assuming 12 waves per map
-                        // Map completed! Unlock next map
+                    if (gameState.wave > 12 && gameState.currentMap !== null) {
                         const nextMapIndex = gameState.currentMap + 1;
                         if (nextMapIndex < maps.length && !gameState.unlockedMaps.includes(nextMapIndex)) {
                             gameState.unlockedMaps.push(nextMapIndex);
@@ -2002,10 +2030,8 @@ function updateUI() {
                         }
                     }
 
-                    // Reset special abilities for next wave
                     resetWaveAbilities();
 
-                    // Better reward system
                     let waveReward = 25 + gameState.wave * 3;
                     gameState.money += waveReward;
 
@@ -2027,16 +2053,13 @@ function updateUI() {
 }
 
 function gameLoop() {
-    // Reset text state for everything in frame
-    ctx.textBaseline = 'alphabetic';  // the canvas default
+    ctx.textBaseline = 'alphabetic';
     ctx.textAlign = 'start';
     ctx.font = '12px Courier New';
     ctx.fillStyle = '#00ff41';
 
-    // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Draw background grid
     ctx.strokeStyle = 'rgba(0, 255, 65, 0.1)';
     ctx.lineWidth = 1;
     for (let x = 0; x < canvas.width; x += 50) {
@@ -2052,46 +2075,39 @@ function gameLoop() {
         ctx.stroke();
     }
 
-    // Always draw the path
     drawPath();
 
-    // Update and draw game elements if game has started
     if (gameState.gameStarted) {
-        // Update and draw friends
         gameState.friends.forEach(friend => {
             friend.update();
             friend.draw();
         });
 
-        // Update and draw enemies
+        gameState.enemies.forEach(e => e.justDied = false);
         gameState.enemies = gameState.enemies.filter(enemy => {
             enemy.update();
             enemy.draw();
             return enemy.alive;
         });
 
-        // Update and draw projectiles
         gameState.projectiles = gameState.projectiles.filter(projectile => {
             projectile.update();
             projectile.draw();
             return projectile.alive;
         });
 
-        // Update and draw banana particles
         gameState.bananas = gameState.bananas.filter(banana => {
             banana.update();
             banana.draw();
             return banana.life > 0;
         });
 
-        // Update and draw trains (Ruel's special ability)
         gameState.trains = gameState.trains.filter(train => {
             train.update();
             train.draw();
             return train.isAlive();
         });
 
-        // Update and draw speech bubbles
         gameState.speechBubbles = gameState.speechBubbles.filter(bubble => {
             bubble.update();
             bubble.draw();
@@ -2099,47 +2115,38 @@ function gameLoop() {
         });
     }
 
-    // Always show placement preview if friend selected
-    if (gameState.selectedFriend && !gameState.gameOver) {
+    if (gameState.selectedFriend && !gameState.gameOver && gameState.mouseX !== undefined && gameState.mouseY !== undefined) {
         const mouseX = gameState.mouseX;
         const mouseY = gameState.mouseY;
 
-        // Check if placement is valid
         const isValid = !isOnPath(mouseX, mouseY) && !isOnFriend(mouseX, mouseY);
 
-        // Preview tower body - enhanced visibility
         ctx.fillStyle = isValid ? 'rgba(0, 255, 65, 0.8)' : 'rgba(255, 0, 0, 0.8)';
         ctx.fillRect(mouseX - 15, mouseY - 15, 30, 30);
 
-        // Border for the preview
         ctx.strokeStyle = isValid ? '#00ff41' : '#ff4757';
         ctx.lineWidth = 3;
         ctx.strokeRect(mouseX - 15, mouseY - 15, 30, 30);
 
-        // Preview tower name
         ctx.fillStyle = 'white';
         ctx.font = 'bold 10px Arial';
         ctx.textAlign = 'center';
         ctx.fillText(gameState.selectedFriend.toUpperCase(), mouseX, mouseY + 3);
 
-        // Range preview circle
         ctx.strokeStyle = isValid ? 'rgba(0, 255, 65, 0.6)' : 'rgba(255, 0, 0, 0.6)';
         ctx.lineWidth = 2;
         ctx.setLineDash([5, 5]);
         ctx.beginPath();
         ctx.arc(mouseX, mouseY, friendTypes[gameState.selectedFriend].range, 0, Math.PI * 2);
         ctx.stroke();
-        ctx.setLineDash([]); // Reset line dash
+        ctx.setLineDash([]);
     }
 
-    // Refresh UI each frame so wave‐end logic in updateUI runs immediately
     updateUI();
 
-    // Continue the game loop
     requestAnimationFrame(gameLoop);
 }
 
-// Event listeners
 canvas.addEventListener('click', (e) => {
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
@@ -2147,15 +2154,12 @@ canvas.addEventListener('click', (e) => {
     console.log(`Canvas clicked at ${x}, ${y}`);
 
     if (!gameState.gameOver && gameState.gameStarted) {
-        // Check for special abilities first
         let specialUsed = false;
 
-        // Check for Dario family photo
         for (let friend of gameState.friends) {
             if (friend.type === 'dario' && !gameState.darioPhotoUsed) {
                 const distance = Math.sqrt((friend.x - x) ** 2 + (friend.y - y) ** 2);
                 if (distance < 25) {
-                    // Trigger family photo!
                     gameState.darioPhotoUsed = true;
                     familyPhoto();
                     specialUsed = true;
@@ -2164,13 +2168,11 @@ canvas.addEventListener('click', (e) => {
             }
         }
 
-        // Check for Ruel train rampage
         if (!specialUsed) {
             for (let friend of gameState.friends) {
                 if (friend.type === 'ruel' && !gameState.trainRampageUsed) {
                     const distance = Math.sqrt((friend.x - x) ** 2 + (friend.y - y) ** 2);
                     if (distance < 25) {
-                        // Trigger train rampage!
                         gameState.trainRampageUsed = true;
                         trainRampage(friend);
                         specialUsed = true;
@@ -2180,13 +2182,11 @@ canvas.addEventListener('click', (e) => {
             }
         }
 
-        // Check for Tony move
         if (!specialUsed) {
             for (let friend of gameState.friends) {
                 if (friend.type === 'tony' && !gameState.tonyMoveUsed) {
                     const distance = Math.sqrt((friend.x - x) ** 2 + (friend.y - y) ** 2);
                     if (distance < 25) {
-                        // Start Tony move
                         gameState.movingTony = friend;
                         addSpeechBubble(friend.x, friend.y - 30, "Hey I'm coming to visit!");
                         showNotification("Click where Tony should move to!");
@@ -2197,7 +2197,6 @@ canvas.addEventListener('click', (e) => {
             }
         }
 
-        // Handle Tony placement
         if (!specialUsed && gameState.movingTony) {
             if (!isOnPath(x, y) && !isOnFriend(x, y)) {
                 gameState.movingTony.x = x;
@@ -2211,7 +2210,6 @@ canvas.addEventListener('click', (e) => {
             }
         }
 
-        // Regular friend placement
         if (!specialUsed && !gameState.movingTony) {
             placeFriend(x, y);
         }
@@ -2230,7 +2228,6 @@ canvas.addEventListener('contextmenu', (e) => {
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
 
-        // Find friend to upgrade
         for (let friend of gameState.friends) {
             const distance = Math.sqrt((friend.x - x) ** 2 + (friend.y - y) ** 2);
             if (distance < 25) {
@@ -2247,22 +2244,49 @@ canvas.addEventListener('mousemove', (e) => {
     gameState.mouseY = e.clientY - rect.top;
 });
 
-// Keyboard controls
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
         if (gameState.selectedFriend) {
             cancelSelection();
         }
-        if (document.getElementById('upgradeModal')?.style.display === 'flex') {
+        const upgradeModal = document.getElementById('upgradeModal');
+        if (upgradeModal && (upgradeModal as HTMLElement).style.display === 'flex') {
             closeUpgradeModal();
         }
-        if (document.getElementById('codexModal')?.style.display === 'flex') {
+        const codexModal = document.getElementById('codexModal');
+        if (codexModal && (codexModal as HTMLElement).style.display === 'flex') {
             closeCodex();
         }
     }
 });
 
-// Make functions globally accessible
+declare global {
+    interface Window {
+        selectFriend: (type: string) => void;
+        startNextWave: () => void;
+        toggleSpeed: () => void;
+        showCodex: () => void;
+        closeCodex: () => void;
+        startWaveFromModal: () => void;
+        closeUpgradeModal: () => void;
+        applyUpgrade: (upgradeType: string) => void;
+        startGame: () => void;
+        showMapSelection: () => void;
+        selectMap: (mapIndex: number) => void;
+        startNewGame: () => void;
+        showStorylineOnly: () => void;
+        deleteSaveSlot: (slotName: string, event: MouseEvent) => void;
+        confirmDelete: () => void;
+        cancelDelete: () => void;
+        showExitConfirm: () => void;
+        confirmExit: () => void;
+        cancelExit: () => void;
+        backToSaveSlots: () => void;
+        startNewGameInSlot: (slotName: string) => void;
+        loadSlotAndSelectMap: (slotName: string, saveData: any) => void;
+    }
+}
+
 window.selectFriend = selectFriend;
 window.startNextWave = startNextWave;
 window.toggleSpeed = toggleSpeed;
@@ -2274,11 +2298,8 @@ window.applyUpgrade = applyUpgrade;
 window.startGame = startGame;
 window.showMapSelection = showMapSelection;
 window.selectMap = selectMap;
-
 window.startNewGame = startNewGame;
 window.showStorylineOnly = showStorylineOnly;
-
-// Add these to your global function assignments
 window.deleteSaveSlot = deleteSaveSlot;
 window.confirmDelete = confirmDelete;
 window.cancelDelete = cancelDelete;
@@ -2286,12 +2307,12 @@ window.showExitConfirm = showExitConfirm;
 window.confirmExit = confirmExit;
 window.cancelExit = cancelExit;
 window.backToSaveSlots = backToSaveSlots;
+window.startNewGameInSlot = startNewGameInSlot;
+window.loadSlotAndSelectMap = loadSlotAndSelectMap;
 
-// Fixed: Initialize properly when page loads
 document.addEventListener('DOMContentLoaded', () => {
     console.log('DOM loaded, initializing game...');
 
-    // Verify canvas is working
     if (ctx) {
         console.log('Canvas context initialized successfully');
         ctx.fillStyle = '#00ff41';
@@ -2301,25 +2322,21 @@ document.addEventListener('DOMContentLoaded', () => {
         console.error('Failed to get canvas context');
     }
 
-    // FORCE storyline modal to show first - hide everything else
     showStorylineOnly();
-
-    updateUI(); // Set initial UI state
-    gameLoop(); // Start the visual loop right away
+    updateUI();
+    gameLoop();
 });
 
 function resetWaveAbilities() {
-    // Reset special abilities for each wave
     gameState.darioPhotoUsed = false;
     gameState.tonyMoveUsed = false;
     gameState.movingTony = null;
     gameState.trainRampageUsed = false;
     console.log('Wave abilities reset!');
 };
-// Save current game state
+
 function saveGame(slotName = 'quicksave') {
     const saveData = {
-        // Core game state
         health: gameState.health,
         money: gameState.money,
         wave: gameState.wave,
@@ -2327,29 +2344,20 @@ function saveGame(slotName = 'quicksave') {
         currentMap: gameState.currentMap,
         totalEnemiesDefeated: gameState.totalEnemiesDefeated,
         codingProgress: gameState.codingProgress,
-        unlockedMaps: gameState.unlockedMaps, // ADD this line
-
-        // Friends data (position, type, upgrades)
+        unlockedMaps: gameState.unlockedMaps,
         friends: gameState.friends.map(friend => ({
             x: friend.x,
             y: friend.y,
             type: friend.type,
             upgrades: friend.upgrades,
-            // Special properties for specific friends
             experienceLevel: friend.experienceLevel || 0
         })),
-
-        // Wave abilities state
         darioPhotoUsed: gameState.darioPhotoUsed,
         tonyMoveUsed: gameState.tonyMoveUsed,
         trainRampageUsed: gameState.trainRampageUsed,
-
-        // Game flags
         gameStarted: gameState.gameStarted,
         mapSelected: gameState.mapSelected,
         waveActive: gameState.waveActive,
-
-        // Timestamp
         savedAt: new Date().toISOString(),
         version: '1.0'
     };
@@ -2362,7 +2370,6 @@ function saveGame(slotName = 'quicksave') {
     }
 }
 
-// Load game state
 function loadGame(slotName = 'quicksave') {
     try {
         const saveDataStr = localStorage.getItem(`benDefense_${slotName}`);
@@ -2373,7 +2380,6 @@ function loadGame(slotName = 'quicksave') {
 
         const saveData = JSON.parse(saveDataStr);
 
-        // Restore core game state
         gameState.health = saveData.health;
         gameState.money = saveData.money;
         gameState.wave = saveData.wave;
@@ -2381,19 +2387,14 @@ function loadGame(slotName = 'quicksave') {
         gameState.currentMap = saveData.currentMap;
         gameState.totalEnemiesDefeated = saveData.totalEnemiesDefeated || 0;
         gameState.codingProgress = saveData.codingProgress || 0;
-        gameState.unlockedMaps = saveData.unlockedMaps || [0]; // ADD this line
-
-        // Restore game flags
+        gameState.unlockedMaps = saveData.unlockedMaps || [0];
         gameState.gameStarted = saveData.gameStarted;
         gameState.mapSelected = saveData.mapSelected;
         gameState.waveActive = saveData.waveActive || false;
-
-        // Restore wave abilities
         gameState.darioPhotoUsed = saveData.darioPhotoUsed || false;
         gameState.tonyMoveUsed = saveData.tonyMoveUsed || false;
         gameState.trainRampageUsed = saveData.trainRampageUsed || false;
 
-        // Clear current game objects
         gameState.friends = [];
         gameState.enemies = [];
         gameState.projectiles = [];
@@ -2401,19 +2402,16 @@ function loadGame(slotName = 'quicksave') {
         gameState.speechBubbles = [];
         gameState.bananas = [];
 
-        // Restore friends
-        if (saveData.friends) { // ADD null check
-            saveData.friends.forEach(friendData => {
+        if (saveData.friends) {
+            saveData.friends.forEach((friendData: any) => {
                 const friend = new Friend(friendData.x, friendData.y, friendData.type);
 
-                // Restore upgrades
                 if (friendData.upgrades) {
-                    friendData.upgrades.forEach(upgradeType => {
+                    friendData.upgrades.forEach((upgradeType: string) => {
                         friend.upgrade(upgradeType);
                     });
                 }
 
-                // Restore special properties
                 if (friendData.experienceLevel) {
                     friend.experienceLevel = friendData.experienceLevel;
                 }
@@ -2434,7 +2432,7 @@ function loadGame(slotName = 'quicksave') {
     }
 }
 
-function getSaveData(slotName) {
+function getSaveData(slotName: string) {
     try {
         const saveDataStr = localStorage.getItem(`benDefense_${slotName}`);
         return saveDataStr ? JSON.parse(saveDataStr) : null;
@@ -2444,50 +2442,37 @@ function getSaveData(slotName) {
     }
 }
 
-function startNewGameInSlot(slotName) {
+function startNewGameInSlot(slotName: string) {
     currentSaveSlot = slotName;
 
-    // Hide start modal
     const startModal = document.getElementById('startGameModal');
-    if (startModal) startModal.style.display = 'none';
+    if (startModal) (startModal as HTMLElement).style.display = 'none';
 
-    // Reset game state
     resetGameState();
-
-    // Show map selection
     showMapSelection();
 }
 
-function loadSlotAndSelectMap(slotName, saveData) {
+function loadSlotAndSelectMap(slotName: string, saveData: any) {
     currentSaveSlot = slotName;
 
-    // Load the save data using existing loadGame function
     if (loadGame(slotName)) {
-        // Hide start modal
         const startModal = document.getElementById('startGameModal');
-        if (startModal) startModal.style.display = 'none';
-
-        // Show map selection with current progress
+        if (startModal) (startModal as HTMLElement).style.display = 'none';
         showMapSelection();
     } else {
-        // If load failed, show error and stay on save slots
         showNotification('Failed to load save game!');
     }
 }
 
 function startNewGame() {
     const startModal = document.getElementById('startGameModal');
-    if (startModal) startModal.style.display = 'none';
+    if (startModal) (startModal as HTMLElement).style.display = 'none';
 
-    // Reset game state for new game
     resetGameState();
-
-    // Show map selection
     showMapSelection();
 }
 
 function resetGameState() {
-    // Reset to initial game state
     gameState.health = 20;
     gameState.money = 100;
     gameState.wave = 1;
@@ -2514,39 +2499,35 @@ function resetGameState() {
     gameState.tonyMoveUsed = false;
     gameState.trainRampageUsed = false;
     gameState.movingTony = null;
-    gameState.unlockedMaps = [0]; // ADD this line
+    gameState.unlockedMaps = [0];
 }
 
 function showStorylineOnly() {
     console.log('Showing storyline modal only');
 
-    // Hide ALL modals first
     document.querySelectorAll('.modal, .storyline-modal').forEach(modal => {
-        modal.style.display = 'none';
+        (modal as HTMLElement).style.display = 'none';
     });
 
-    // Show ONLY the storyline modal
     const storylineModal = document.getElementById('storylineModal');
     if (storylineModal) {
-        storylineModal.style.display = 'flex';
+        (storylineModal as HTMLElement).style.display = 'flex';
         console.log('Storyline modal is now visible');
     }
 
-    // Dim and disable the game UI completely
-    const gameContainer = document.querySelector('.game-container');
+    const gameContainer = document.querySelector('.game-container') as HTMLElement;
     if (gameContainer) {
         gameContainer.style.opacity = '0.3';
         gameContainer.style.pointerEvents = 'none';
     }
 
-    // Make sure game state is reset
     gameState.gameStarted = false;
     gameState.mapSelected = false;
     gameState.gameOver = false;
 }
 
-function deleteSaveSlot(slotName, event) {
-    event.stopPropagation(); // Prevent slot selection
+function deleteSaveSlot(slotName: string, event: MouseEvent) {
+    event.stopPropagation();
 
     const saveData = getSaveData(slotName);
     if (!saveData) return;
@@ -2556,14 +2537,15 @@ function deleteSaveSlot(slotName, event) {
     const deleteModal = document.getElementById('deleteConfirmModal');
     const deleteText = document.getElementById('deleteConfirmText');
 
-    const mapName = maps[saveData.currentMap]?.name || 'Unknown Map';
-    deleteText.innerHTML = `
-        Are you sure you want to delete this save?<br><br>
-        <strong>Wave ${saveData.wave}</strong> • ${mapName}<br>
-        <small>This action cannot be undone.</small>
-    `;
-
-    deleteModal.style.display = 'flex';
+    if (deleteModal && deleteText) {
+        const mapName = maps[saveData.currentMap]?.name || 'Unknown Map';
+        deleteText.innerHTML = `
+            Are you sure you want to delete this save?<br><br>
+            <strong>Wave ${saveData.wave}</strong> • ${mapName}<br>
+            <small>This action cannot be undone.</small>
+        `;
+        (deleteModal as HTMLElement).style.display = 'flex';
+    }
 }
 
 function confirmDelete() {
@@ -2572,44 +2554,38 @@ function confirmDelete() {
         showNotification(`Save slot deleted!`);
         currentSlotToDelete = null;
 
-        // Close delete modal and refresh save slots
-        document.getElementById('deleteConfirmModal').style.display = 'none';
+        const deleteModal = document.getElementById('deleteConfirmModal');
+        if (deleteModal) (deleteModal as HTMLElement).style.display = 'none';
         showStartGameOptions();
     }
 }
 
 function cancelDelete() {
     currentSlotToDelete = null;
-    document.getElementById('deleteConfirmModal').style.display = 'none';
+    const deleteModal = document.getElementById('deleteConfirmModal');
+    if (deleteModal) (deleteModal as HTMLElement).style.display = 'none';
 }
 
 function showExitConfirm() {
     const exitModal = document.getElementById('exitConfirmModal');
     if (exitModal) {
-        exitModal.style.display = 'flex';
-        console.log('Exit modal should now be visible');
-    } else {
-        console.error('Exit modal not found!');
+        (exitModal as HTMLElement).style.display = 'flex';
     }
 }
 
 function confirmExit() {
-    // Auto-save current progress
     if (currentSaveSlot) {
         autoSaveToSlot();
     }
 
-    // Close all modals
     closeAllModals();
-
-    // Reset game state and show map selection
     showMapSelection();
-
     showNotification('Progress saved!');
 }
 
 function cancelExit() {
-    document.getElementById('exitConfirmModal').style.display = 'none';
+    const exitModal = document.getElementById('exitConfirmModal');
+    if (exitModal) (exitModal as HTMLElement).style.display = 'none';
 }
 
 function autoSaveToSlot() {
@@ -2622,7 +2598,7 @@ function autoSaveToSlot() {
             currentMap: gameState.currentMap,
             totalEnemiesDefeated: gameState.totalEnemiesDefeated,
             codingProgress: gameState.codingProgress,
-            unlockedMaps: gameState.unlockedMaps, // ADD this missing property
+            unlockedMaps: gameState.unlockedMaps,
             friends: gameState.friends.map(friend => ({
                 x: friend.x,
                 y: friend.y,
@@ -2641,24 +2617,18 @@ function autoSaveToSlot() {
         };
 
         localStorage.setItem(`benDefense_${currentSaveSlot}`, JSON.stringify(saveData));
-        console.log('Auto-saved to slot:', currentSaveSlot); // ADD for debugging
+        console.log('Auto-saved to slot:', currentSaveSlot);
     } else {
-        console.log('No currentSaveSlot set - cannot auto-save'); // ADD for debugging
+        console.log('No currentSaveSlot set - cannot auto-save');
     }
 }
 
 function backToSaveSlots() {
-    // Close map selection modal
     const mapModal = document.getElementById('mapSelectionModal');
-    if (mapModal) mapModal.style.display = 'none';
+    if (mapModal) (mapModal as HTMLElement).style.display = 'none';
 
-    // Clear current slot selection
     currentSaveSlot = null;
-
-    // Reset game state to clean slate
     resetGameState();
-
-    // Show save slots again
     showStartGameOptions();
 }
 
@@ -2666,90 +2636,88 @@ function showStartGameOptions() {
     const startModal = document.getElementById('startGameModal');
     const slotGrid = document.getElementById('saveSlotGrid');
 
-    // Generate 3 save slots
-    slotGrid.innerHTML = '';
+    if (startModal && slotGrid) {
+        slotGrid.innerHTML = '';
 
-    for (let i = 1; i <= 3; i++) {
-        const slotName = `slot${i}`;
-        const saveData = getSaveData(slotName);
+        for (let i = 1; i <= 3; i++) {
+            const slotName = `slot${i}`;
+            const saveData = getSaveData(slotName);
 
-        const slotDiv = document.createElement('div');
-        slotDiv.style.cssText = `
-            background: rgba(0, 255, 65, 0.1);
-            border: 2px solid #00ff41;
-            border-radius: 15px;
-            padding: 25px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            position: relative;
-            min-height: 120px;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-        `;
-
-        if (saveData) {
-            // Slot has save data
-            const saveTime = new Date(saveData.savedAt).toLocaleString();
-            const mapName = maps[saveData.currentMap]?.name || 'Unknown Map';
-
-            slotDiv.innerHTML = `
-                <div style="text-align: left;">
-                    <div style="font-size: 18px; font-weight: bold; margin-bottom: 8px; color: #00ff41;">
-                        Save Slot ${i}
-                    </div>
-                    <div style="font-size: 14px; margin-bottom: 4px;">
-                        <strong>Wave ${saveData.wave}</strong> • ${saveData.score} commits
-                    </div>
-                    <div style="font-size: 12px; opacity: 0.8; margin-bottom: 4px;">
-                        📍 ${mapName} • ❤️ ${saveData.health} • 💰 ${saveData.money}
-                    </div>
-                    <div style="font-size: 11px; opacity: 0.6;">
-                        ${saveTime}
-                    </div>
-                </div>
-                <button onclick="deleteSaveSlot('${slotName}', event)" 
-                        style="position: absolute; top: 10px; right: 10px; background: #ff4757; border: none; 
-                               border-radius: 5px; color: white; padding: 5px 8px; cursor: pointer; font-size: 12px;">
-                    🗑️
-                </button>
+            const slotDiv = document.createElement('div');
+            slotDiv.style.cssText = `
+                background: rgba(0, 255, 65, 0.1);
+                border: 2px solid #00ff41;
+                border-radius: 15px;
+                padding: 25px;
+                cursor: pointer;
+                transition: all 0.3s ease;
+                position: relative;
+                min-height: 120px;
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
             `;
 
-            slotDiv.addEventListener('click', () => loadSlotAndSelectMap(slotName, saveData));
-        } else {
-            // Empty slot
-            slotDiv.innerHTML = `
-                <div style="text-align: center; opacity: 0.8;">
-                    <div style="font-size: 18px; font-weight: bold; margin-bottom: 10px; color: #00ff41;">
-                        Save Slot ${i}
-                    </div>
-                    <div style="font-size: 48px; margin-bottom: 10px;">➕</div>
-                    <div style="font-size: 14px;">
-                        Start New Game
-                    </div>
-                </div>
-            `;
+            if (saveData) {
+                const saveTime = new Date(saveData.savedAt).toLocaleString();
+                const mapName = maps[saveData.currentMap]?.name || 'Unknown Map';
 
-            slotDiv.addEventListener('click', () => startNewGameInSlot(slotName));
+                slotDiv.innerHTML = `
+                    <div style="text-align: left;">
+                        <div style="font-size: 18px; font-weight: bold; margin-bottom: 8px; color: #00ff41;">
+                            Save Slot ${i}
+                        </div>
+                        <div style="font-size: 14px; margin-bottom: 4px;">
+                            <strong>Wave ${saveData.wave}</strong> • ${saveData.score} commits
+                        </div>
+                        <div style="font-size: 12px; opacity: 0.8; margin-bottom: 4px;">
+                            📍 ${mapName} • ❤️ ${saveData.health} • 💰 ${saveData.money}
+                        </div>
+                        <div style="font-size: 11px; opacity: 0.6;">
+                            ${saveTime}
+                        </div>
+                    </div>
+                    <button onclick="window.deleteSaveSlot('${slotName}', event)"
+                            style="position: absolute; top: 10px; right: 10px; background: #ff4757; border: none;
+                                   border-radius: 5px; color: white; padding: 5px 8px; cursor: pointer; font-size: 12px;">
+                        🗑️
+                    </button>
+                `;
+
+                slotDiv.addEventListener('click', () => loadSlotAndSelectMap(slotName, saveData));
+            } else {
+                slotDiv.innerHTML = `
+                    <div style="text-align: center; opacity: 0.8;">
+                        <div style="font-size: 18px; font-weight: bold; margin-bottom: 10px; color: #00ff41;">
+                            Save Slot ${i}
+                        </div>
+                        <div style="font-size: 48px; margin-bottom: 10px;">➕</div>
+                        <div style="font-size: 14px;">
+                            Start New Game
+                        </div>
+                    </div>
+                `;
+
+                slotDiv.addEventListener('click', () => startNewGameInSlot(slotName));
+            }
+
+            slotDiv.addEventListener('mouseenter', () => {
+                slotDiv.style.background = 'rgba(0, 255, 65, 0.2)';
+                slotDiv.style.transform = 'translateY(-3px)';
+                slotDiv.style.boxShadow = '0 8px 25px rgba(0, 255, 65, 0.3)';
+            });
+
+            slotDiv.addEventListener('mouseleave', () => {
+                slotDiv.style.background = 'rgba(0, 255, 65, 0.1)';
+                slotDiv.style.transform = 'translateY(0)';
+                slotDiv.style.boxShadow = 'none';
+            });
+
+            slotGrid.appendChild(slotDiv);
         }
 
-        // Hover effects
-        slotDiv.addEventListener('mouseenter', () => {
-            slotDiv.style.background = 'rgba(0, 255, 65, 0.2)';
-            slotDiv.style.transform = 'translateY(-3px)';
-            slotDiv.style.boxShadow = '0 8px 25px rgba(0, 255, 65, 0.3)';
-        });
-
-        slotDiv.addEventListener('mouseleave', () => {
-            slotDiv.style.background = 'rgba(0, 255, 65, 0.1)';
-            slotDiv.style.transform = 'translateY(0)';
-            slotDiv.style.boxShadow = 'none';
-        });
-
-        slotGrid.appendChild(slotDiv);
+        (startModal as HTMLElement).style.display = 'flex';
     }
-
-    startModal.style.display = 'flex';
 }
 
 function closeAllModals() {
@@ -2765,12 +2733,11 @@ function closeAllModals() {
     modals.forEach(modalId => {
         const modal = document.getElementById(modalId);
         if (modal) {
-            modal.style.display = 'none';
+            (modal as HTMLElement).style.display = 'none';
         }
     });
-
-    // Don't close storyline modals (startGameModal, mapSelectionModal, storylineModal)
 }
+
 function autoSave() {
     if (currentSaveSlot && gameState.gameStarted && !gameState.gameOver) {
         autoSaveToSlot();
