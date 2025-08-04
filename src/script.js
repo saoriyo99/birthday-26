@@ -1,3 +1,5 @@
+import './style.css';
+
 // Initialize canvas and context first
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
