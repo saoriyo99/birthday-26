@@ -424,6 +424,7 @@ export function showMapSelection() {
 }
 
 export function selectMap(mapIndex: number) {
+    resetGameState();
     setGameState({
         currentMap: mapIndex,
         mapSelected: true,
