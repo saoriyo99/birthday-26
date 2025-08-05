@@ -17,7 +17,7 @@
   "bugs": {
     "url": "https://github.com/saoriyo99/birthday-26/issues"
   },
-  "homepage": "https://github.com/saoriyo99/birthday-26#readme",
+  "homepage": "https://saoriyo99.github.io/birthday-26",
   "devDependencies": {
     "css-loader": "^7.1.2",
     "html-webpack-plugin": "^5.6.3",
