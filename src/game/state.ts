@@ -32,7 +32,7 @@ export let gameState: GameState = {
     tonyMoveUsed: false,
     trainRampageUsed: false,
     movingTony: null,
-    unlockedMaps: [0]
+    unlockedMaps: [0, 1, 2, 3, 4, 5, 6]
 };
 
 export function resetGameState() {
@@ -62,7 +62,7 @@ export function resetGameState() {
     gameState.tonyMoveUsed = false;
     gameState.trainRampageUsed = false;
     gameState.movingTony = null;
-    gameState.unlockedMaps = [0];
+    gameState.unlockedMaps = [0, 1, 2, 3, 4, 5, 6];
 }
 
 export function setGameState(newState: Partial<GameState>) {
